@@ -1748,4 +1748,1436 @@ task.spawn(function()
 		task.wait(5)
 		pcall(safeGCScan)
 	end
-end)
+end)-- ========================================================
+-- XRBLOX PLAYER VIEW
+-- ADICIONADO AO XRBLOX HUB V8.4
+-- NÃO ALTERA AS FUNÇÕES EXISTENTES
+-- ========================================================
+
+do
+
+	--------------------------------------------------------
+	-- PAGE
+	--------------------------------------------------------
+
+	local ViewPage = newPage("VIEWS")
+
+	local ViewTarget = nil
+	local ViewMode = "THIRD"
+	local Viewing = false
+
+	local ViewTargetLabel
+	local ViewStatusLabel
+	local ViewModeLabel
+	local ViewButton
+	local PlayerScroll
+
+	--------------------------------------------------------
+	-- CAMERA RESTORE
+	--------------------------------------------------------
+
+	local function restoreViewCamera()
+
+		Viewing = false
+
+		local camera = workspace.CurrentCamera
+
+		if camera then
+
+			camera.CameraType = Enum.CameraType.Custom
+
+			local character = LocalPlayer.Character
+
+			if character then
+
+				local humanoid =
+					character:FindFirstChildOfClass("Humanoid")
+
+				if humanoid then
+					camera.CameraSubject = humanoid
+				end
+
+			end
+
+			if Config.FOV then
+				camera.FieldOfView = Config.FOVValue
+			else
+				camera.FieldOfView = OriginalFOV
+			end
+
+		end
+
+		if ViewStatusLabel then
+			ViewStatusLabel.Text = "STATUS: CÂMERA LOCAL"
+			ViewStatusLabel.TextColor3 = SUBTEXT
+		end
+
+		if ViewButton then
+			ViewButton.Text = "◉ VIEW PLAYER"
+		end
+
+	end
+
+	--------------------------------------------------------
+	-- CHARACTER HELPERS
+	--------------------------------------------------------
+
+	local function getViewRoot(player)
+
+		if not player then
+			return nil
+		end
+
+		local character = player.Character
+
+		if not character then
+			return nil
+		end
+
+		return character:FindFirstChild("HumanoidRootPart")
+
+	end
+
+	local function getViewHead(player)
+
+		if not player then
+			return nil
+		end
+
+		local character = player.Character
+
+		if not character then
+			return nil
+		end
+
+		return character:FindFirstChild("Head")
+
+	end
+
+	--------------------------------------------------------
+	-- UPDATE CAMERA
+	--------------------------------------------------------
+
+	local function updateViewCamera()
+
+		if not Viewing then
+			return
+		end
+
+		if not ViewTarget then
+			restoreViewCamera()
+			return
+		end
+
+		if ViewTarget == LocalPlayer then
+			restoreViewCamera()
+			return
+		end
+
+		local root = getViewRoot(ViewTarget)
+		local head = getViewHead(ViewTarget)
+
+		if not root then
+			return
+		end
+
+		local camera = workspace.CurrentCamera
+
+		if not camera then
+			return
+		end
+
+		camera.CameraType =
+			Enum.CameraType.Scriptable
+
+		----------------------------------------------------
+		-- FIRST PERSON
+		----------------------------------------------------
+
+		if ViewMode == "FIRST" then
+
+			if head then
+
+				local target =
+					head.CFrame *
+					CFrame.new(0,0.12,0)
+
+				camera.CFrame =
+					camera.CFrame:Lerp(
+						target,
+						0.35
+					)
+
+			end
+
+		----------------------------------------------------
+		-- THIRD PERSON
+		----------------------------------------------------
+
+		elseif ViewMode == "THIRD" then
+
+			local position =
+				root.Position +
+				Vector3.new(0,4,10)
+
+			local target =
+				CFrame.lookAt(
+					position,
+					root.Position +
+					Vector3.new(0,1.5,0)
+				)
+
+			camera.CFrame =
+				camera.CFrame:Lerp(
+					target,
+					0.22
+				)
+
+		----------------------------------------------------
+		-- FOLLOW
+		----------------------------------------------------
+
+		elseif ViewMode == "FOLLOW" then
+
+			local velocity =
+				root.AssemblyLinearVelocity
+
+			local offset =
+				Vector3.new(0,6,14)
+
+			if velocity.Magnitude > 2 then
+
+				local direction =
+					velocity.Unit
+
+				offset =
+					-direction * 14 +
+					Vector3.new(0,6,0)
+
+			end
+
+			local position =
+				root.Position + offset
+
+			local target =
+				CFrame.lookAt(
+					position,
+					root.Position +
+					Vector3.new(0,2,0)
+				)
+
+			camera.CFrame =
+				camera.CFrame:Lerp(
+					target,
+					0.16
+				)
+
+		end
+
+		if Config.FOV then
+			camera.FieldOfView =
+				Config.FOVValue
+		end
+
+	end
+
+	--------------------------------------------------------
+	-- GET PLAYERS
+	--------------------------------------------------------
+
+	local function getViewPlayers()
+
+		local list = {}
+
+		for _,player in ipairs(
+			Players:GetPlayers()
+		) do
+
+			if player ~= LocalPlayer then
+				table.insert(list,player)
+			end
+
+		end
+
+		table.sort(
+			list,
+			function(a,b)
+				return string.lower(a.Name)
+					<
+					string.lower(b.Name)
+			end
+		)
+
+		return list
+
+	end
+
+	--------------------------------------------------------
+	-- TARGET INDEX
+	--------------------------------------------------------
+
+	local function getViewTargetIndex()
+
+		if not ViewTarget then
+			return 0
+		end
+
+		local players =
+			getViewPlayers()
+
+		for index,player in ipairs(players) do
+
+			if player == ViewTarget then
+				return index
+			end
+
+		end
+
+		return 0
+
+	end
+
+	--------------------------------------------------------
+	-- TARGET INFO
+	--------------------------------------------------------
+
+	local function updateViewInfo()
+
+		if not ViewTarget then
+
+			if ViewTargetLabel then
+				ViewTargetLabel.Text =
+					"TARGET: NENHUM JOGADOR"
+			end
+
+			if ViewStatusLabel then
+				ViewStatusLabel.Text =
+					"STATUS: SELECIONE UM JOGADOR"
+
+				ViewStatusLabel.TextColor3 =
+					SUBTEXT
+			end
+
+			return
+
+		end
+
+		local displayName =
+			ViewTarget.DisplayName ~= ""
+			and ViewTarget.DisplayName
+			or ViewTarget.Name
+
+		if ViewTargetLabel then
+
+			ViewTargetLabel.Text =
+				"TARGET: " ..
+				displayName ..
+				"  @" ..
+				ViewTarget.Name
+
+		end
+
+		if ViewStatusLabel then
+
+			if Viewing then
+
+				ViewStatusLabel.Text =
+					"STATUS: VISUALIZANDO • " ..
+					ViewMode
+
+				ViewStatusLabel.TextColor3 =
+					Config.HubColor
+
+			else
+
+				ViewStatusLabel.Text =
+					"STATUS: TARGET SELECIONADO"
+
+				ViewStatusLabel.TextColor3 =
+					SUBTEXT
+
+			end
+
+		end
+
+	end
+
+	--------------------------------------------------------
+	-- SELECT PLAYER
+	--------------------------------------------------------
+
+	local function selectViewTarget(player)
+
+		if not player then
+			return
+		end
+
+		if player == LocalPlayer then
+			return
+		end
+
+		ViewTarget = player
+
+		updateViewInfo()
+
+		if PlayerScroll then
+
+			for _,child in ipairs(
+				PlayerScroll:GetChildren()
+			) do
+
+				if child:IsA("TextButton") then
+
+					local id =
+						child:GetAttribute(
+							"TargetUserId"
+						)
+
+					if id
+					and tonumber(id)
+					== player.UserId then
+
+						child.BackgroundColor3 =
+							Config.HubColor
+
+						child.TextColor3 =
+							Color3.new(1,1,1)
+
+					else
+
+						child.BackgroundColor3 =
+							PANEL2
+
+						child.TextColor3 =
+							TEXT
+
+					end
+
+				end
+
+			end
+
+		end
+
+	end
+
+	--------------------------------------------------------
+	-- PLAYER LIST
+	--------------------------------------------------------
+
+	local function rebuildViewPlayers()
+
+		if not PlayerScroll then
+			return
+		end
+
+		for _,child in ipairs(
+			PlayerScroll:GetChildren()
+		) do
+
+			if child:IsA("TextButton") then
+				child:Destroy()
+			end
+
+		end
+
+		local players =
+			getViewPlayers()
+
+		for index,player in ipairs(players) do
+
+			local displayName =
+				player.DisplayName ~= ""
+				and player.DisplayName
+				or player.Name
+
+			local playerButton =
+				Instance.new("TextButton")
+
+			playerButton.Name =
+				"ViewPlayer_" ..
+				player.UserId
+
+			playerButton.Size =
+				UDim2.new(
+					1,
+					-8,
+					0,
+					36
+				)
+
+			playerButton.Position =
+				UDim2.fromOffset(
+					4,
+					(index - 1) * 40
+				)
+
+			playerButton.BackgroundColor3 =
+				player == ViewTarget
+				and Config.HubColor
+				or PANEL2
+
+			playerButton.BorderSizePixel = 0
+
+			playerButton.Text =
+				"  ◈  " ..
+				displayName ..
+				"  @" ..
+				player.Name
+
+			playerButton.TextColor3 =
+				player == ViewTarget
+				and Color3.new(1,1,1)
+				or TEXT
+
+			playerButton.TextSize = 9
+			playerButton.Font = Enum.Font.Code
+
+			playerButton.TextXAlignment =
+				Enum.TextXAlignment.Left
+
+			playerButton.AutoButtonColor = false
+
+			playerButton:SetAttribute(
+				"TargetUserId",
+				player.UserId
+			)
+
+			playerButton.Parent =
+				PlayerScroll
+
+			Instance.new(
+				"UICorner",
+				playerButton
+			).CornerRadius =
+				UDim.new(0,6)
+
+			local stroke =
+				Instance.new("UIStroke")
+
+			stroke.Color =
+				player == ViewTarget
+				and Config.HubColor
+				or Color3.fromRGB(
+					45,
+					47,
+					55
+				)
+
+			stroke.Transparency = 0.4
+			stroke.Parent = playerButton
+
+			playerButton.MouseEnter:Connect(
+				function()
+
+					if player ~= ViewTarget then
+
+						TweenService:Create(
+							playerButton,
+							TweenInfo.new(0.12),
+							{
+								BackgroundColor3 =
+									PANEL3
+							}
+						):Play()
+
+					end
+
+				end
+			)
+
+			playerButton.MouseLeave:Connect(
+				function()
+
+					if player ~= ViewTarget then
+
+						TweenService:Create(
+							playerButton,
+							TweenInfo.new(0.12),
+							{
+								BackgroundColor3 =
+									PANEL2
+							}
+						):Play()
+
+					end
+
+				end
+			)
+
+			playerButton.MouseButton1Click:Connect(
+				function()
+
+					selectViewTarget(player)
+
+					rebuildViewPlayers()
+
+				end
+			)
+
+		end
+
+		PlayerScroll.CanvasSize =
+			UDim2.fromOffset(
+				0,
+				math.max(
+					#players * 40,
+					1
+				)
+			)
+
+	end
+
+	--------------------------------------------------------
+	-- NEXT / PREVIOUS
+	--------------------------------------------------------
+
+	local function cycleViewTarget(direction)
+
+		local players =
+			getViewPlayers()
+
+		if #players == 0 then
+
+			ViewTarget = nil
+
+			updateViewInfo()
+
+			return
+
+		end
+
+		local index =
+			getViewTargetIndex()
+
+		if index == 0 then
+
+			if direction > 0 then
+				index = 1
+			else
+				index = #players
+			end
+
+		else
+
+			index =
+				index + direction
+
+			if index > #players then
+				index = 1
+			elseif index < 1 then
+				index = #players
+			end
+
+		end
+
+		selectViewTarget(
+			players[index]
+		)
+
+		rebuildViewPlayers()
+
+	end
+
+	--------------------------------------------------------
+	-- START VIEW
+	--------------------------------------------------------
+
+	local function startView()
+
+		if not ViewTarget then
+
+			cycleViewTarget(1)
+
+			if not ViewTarget then
+				return
+			end
+
+		end
+
+		if not ViewTarget.Character then
+			return
+		end
+
+		Viewing = true
+
+		local camera =
+			workspace.CurrentCamera
+
+		if camera then
+			camera.CameraType =
+				Enum.CameraType.Scriptable
+		end
+
+		if ViewButton then
+			ViewButton.Text =
+				"■ EXIT VIEW"
+		end
+
+		updateViewInfo()
+
+	end
+
+	--------------------------------------------------------
+	-- TOGGLE VIEW
+	--------------------------------------------------------
+
+	local function toggleView()
+
+		if Viewing then
+			restoreViewCamera()
+		else
+			startView()
+		end
+
+	end
+
+	--------------------------------------------------------
+	-- CAMERA MODE
+	--------------------------------------------------------
+
+	local function setViewMode(mode)
+
+		ViewMode = mode
+
+		if ViewModeLabel then
+
+			if mode == "FIRST" then
+
+				ViewModeLabel.Text =
+					"MODE: FIRST PERSON"
+
+			elseif mode == "THIRD" then
+
+				ViewModeLabel.Text =
+					"MODE: THIRD PERSON"
+
+			elseif mode == "FOLLOW" then
+
+				ViewModeLabel.Text =
+					"MODE: FOLLOW"
+
+			end
+
+		end
+
+		updateViewInfo()
+
+	end
+
+	--------------------------------------------------------
+	-- MAIN VIEW BOX
+	--------------------------------------------------------
+
+	local ViewBox =
+		createSection(
+			ViewPage,
+			"PLAYER VIEW // CAMERA CONTROL",
+			555
+		)
+
+	ViewBox.Position =
+		UDim2.fromOffset(0,0)
+
+	--------------------------------------------------------
+	-- INFORMATION
+	--------------------------------------------------------
+
+	local ViewInfo =
+		label(
+			ViewBox,
+			"◈ SELECIONE UM JOGADOR PARA CONTROLAR A CÂMERA",
+			40,
+			25
+		)
+
+	ViewInfo.TextColor3 =
+		SUBTEXT
+
+	ViewTargetLabel =
+		label(
+			ViewBox,
+			"TARGET: NENHUM JOGADOR",
+			68,
+			25
+		)
+
+	ViewTargetLabel.TextColor3 =
+		Config.HubColor
+
+	ViewStatusLabel =
+		label(
+			ViewBox,
+			"STATUS: CÂMERA LOCAL",
+			94,
+			25
+		)
+
+	ViewStatusLabel.TextColor3 =
+		SUBTEXT
+
+	local PlayersTitle =
+		label(
+			ViewBox,
+			"◈ PLAYERS ONLINE",
+			125,
+			22
+		)
+
+	PlayersTitle.TextColor3 =
+		Config.HubColor
+
+	--------------------------------------------------------
+	-- PLAYER SCROLL
+	--------------------------------------------------------
+
+	PlayerScroll =
+		Instance.new("ScrollingFrame")
+
+	PlayerScroll.Name =
+		"ViewPlayerList"
+
+	PlayerScroll.Size =
+		UDim2.new(
+			1,
+			-20,
+			0,
+			150
+		)
+
+	PlayerScroll.Position =
+		UDim2.fromOffset(
+			10,
+			150
+		)
+
+	PlayerScroll.BackgroundColor3 =
+		PANEL2
+
+	PlayerScroll.BorderSizePixel = 0
+
+	PlayerScroll.ScrollBarThickness = 3
+
+	PlayerScroll.ScrollBarImageColor3 =
+		Config.HubColor
+
+	PlayerScroll.CanvasSize =
+		UDim2.fromOffset(0,0)
+
+	PlayerScroll.Parent =
+		ViewBox
+
+	Instance.new(
+		"UICorner",
+		PlayerScroll
+	).CornerRadius =
+		UDim.new(0,8)
+
+	--------------------------------------------------------
+	-- PREV
+	--------------------------------------------------------
+
+	local PrevButton =
+		button(
+			ViewBox,
+			"◀ PREV",
+			310,
+			38
+		)
+
+	PrevButton.Size =
+		UDim2.new(
+			0.5,
+			-15,
+			0,
+			38
+		)
+
+	--------------------------------------------------------
+	-- NEXT
+	--------------------------------------------------------
+
+	local NextButton =
+		button(
+			ViewBox,
+			"NEXT ▶",
+			310,
+			38
+		)
+
+	NextButton.Size =
+		UDim2.new(
+			0.5,
+			-15,
+			0,
+			38
+		)
+
+	NextButton.Position =
+		UDim2.new(
+			0.5,
+			5,
+			0,
+			310
+		)
+
+	PrevButton.MouseButton1Click:Connect(
+		function()
+			cycleViewTarget(-1)
+		end
+	)
+
+	NextButton.MouseButton1Click:Connect(
+		function()
+			cycleViewTarget(1)
+		end
+	)
+
+	--------------------------------------------------------
+	-- CAMERA MODE BOX
+	--------------------------------------------------------
+
+	local ModeBox =
+		Instance.new("Frame")
+
+	ModeBox.Size =
+		UDim2.new(
+			1,
+			-20,
+			0,
+			76
+		)
+
+	ModeBox.Position =
+		UDim2.fromOffset(
+			10,
+			360
+		)
+
+	ModeBox.BackgroundColor3 =
+		PANEL2
+
+	ModeBox.BorderSizePixel = 0
+
+	ModeBox.Parent =
+		ViewBox
+
+	Instance.new(
+		"UICorner",
+		ModeBox
+	).CornerRadius =
+		UDim.new(0,8)
+
+	--------------------------------------------------------
+	-- MODE TITLE
+	--------------------------------------------------------
+
+	local ModeTitle =
+		Instance.new("TextLabel")
+
+	ModeTitle.Size =
+		UDim2.new(
+			1,
+			-20,
+			0,
+			20
+		)
+
+	ModeTitle.Position =
+		UDim2.fromOffset(
+			10,
+			5
+		)
+
+	ModeTitle.BackgroundTransparency = 1
+
+	ModeTitle.Text =
+		"◈ CAMERA MODE"
+
+	ModeTitle.TextColor3 =
+		Config.HubColor
+
+	ModeTitle.TextSize = 9
+
+	ModeTitle.Font =
+		Enum.Font.Code
+
+	ModeTitle.TextXAlignment =
+		Enum.TextXAlignment.Left
+
+	ModeTitle.Parent =
+		ModeBox
+
+	--------------------------------------------------------
+	-- MODE BUTTONS
+	--------------------------------------------------------
+
+	local function createModeButton(
+		text,
+		position,
+		mode
+	)
+
+		local b =
+			Instance.new("TextButton")
+
+		b.Size =
+			UDim2.new(
+				0.31,
+				0,
+				0,
+				34
+			)
+
+		b.Position =
+			UDim2.new(
+				position,
+				0,
+				0,
+				30
+			)
+
+		b.BackgroundColor3 =
+			mode == ViewMode
+			and Config.HubColor
+			or PANEL3
+
+		b.BorderSizePixel = 0
+
+		b.Text = text
+
+		b.TextColor3 =
+			Color3.new(1,1,1)
+
+		b.TextSize = 8
+
+		b.Font =
+			Enum.Font.GothamBold
+
+		b.AutoButtonColor = false
+
+		b.Parent =
+			ModeBox
+
+		Instance.new(
+			"UICorner",
+			b
+		).CornerRadius =
+			UDim.new(0,6)
+
+		b.MouseButton1Click:Connect(
+			function()
+
+				setViewMode(mode)
+
+				for _,child in ipairs(
+					ModeBox:GetChildren()
+				) do
+
+					if child:IsA("TextButton") then
+						child.BackgroundColor3 =
+							PANEL3
+					end
+
+				end
+
+				b.BackgroundColor3 =
+					Config.HubColor
+
+			end
+		)
+
+		return b
+
+	end
+
+	createModeButton(
+		"FIRST",
+		0.01,
+		"FIRST"
+	)
+
+	createModeButton(
+		"THIRD",
+		0.345,
+		"THIRD"
+	)
+
+	createModeButton(
+		"FOLLOW",
+		0.68,
+		"FOLLOW"
+	)
+
+	--------------------------------------------------------
+	-- MODE LABEL
+	--------------------------------------------------------
+
+	ViewModeLabel =
+		label(
+			ViewBox,
+			"MODE: THIRD PERSON",
+			445,
+			22
+		)
+
+	ViewModeLabel.TextColor3 =
+		SUBTEXT
+
+	--------------------------------------------------------
+	-- VIEW BUTTON
+	--------------------------------------------------------
+
+	ViewButton =
+		button(
+			ViewBox,
+			"◉ VIEW PLAYER",
+			475,
+			40
+		)
+
+	ViewButton.MouseButton1Click:Connect(
+		function()
+			toggleView()
+		end
+	)
+
+	--------------------------------------------------------
+	-- NAV BUTTON
+	--------------------------------------------------------
+
+	local ViewNav =
+		nav(
+			"◈ VIEWS",
+			257,
+			ViewPage
+		)
+
+	--------------------------------------------------------
+	-- INITIALIZE
+	--------------------------------------------------------
+
+	rebuildViewPlayers()
+	updateViewInfo()
+
+	--------------------------------------------------------
+	-- CAMERA LOOP
+	--------------------------------------------------------
+
+	local ViewConnection =
+		RunService.RenderStepped:Connect(
+			function()
+
+				if not Gui.Parent then
+					return
+				end
+
+				if Viewing then
+					updateViewCamera()
+				end
+
+			end
+		)
+
+	--------------------------------------------------------
+	-- PLAYER ADDED
+	--------------------------------------------------------
+
+	Players.PlayerAdded:Connect(
+		function()
+
+			task.wait(0.2)
+
+			rebuildViewPlayers()
+
+		end
+	)
+
+	--------------------------------------------------------
+	-- PLAYER REMOVING
+	--------------------------------------------------------
+
+	Players.PlayerRemoving:Connect(
+		function(player)
+
+			if player == ViewTarget then
+
+				ViewTarget = nil
+
+				restoreViewCamera()
+
+				updateViewInfo()
+
+			end
+
+			task.defer(
+				function()
+					rebuildViewPlayers()
+				end
+			)
+
+		end
+	)
+
+	--------------------------------------------------------
+	-- CHARACTER RESPAWN
+	--------------------------------------------------------
+
+	LocalPlayer.CharacterAdded:Connect(
+		function()
+
+			task.wait(0.5)
+
+			if not Viewing then
+				restoreViewCamera()
+			end
+
+		end
+	)
+
+	--------------------------------------------------------
+	-- COLOR UPDATE
+	--------------------------------------------------------
+
+	task.spawn(
+		function()
+
+			while Gui.Parent do
+
+				task.wait(0.25)
+
+				if ViewPage.Parent then
+
+					ViewPage.ScrollBarImageColor3 =
+						Config.HubColor
+
+					if ViewTargetLabel then
+
+						ViewTargetLabel.TextColor3 =
+							Config.HubColor
+
+					end
+
+					if PlayerScroll then
+
+						PlayerScroll.ScrollBarImageColor3 =
+							Config.HubColor
+
+					end
+
+				end
+
+			end
+
+		end
+	)
+
+	--------------------------------------------------------
+	-- CLEANUP
+	--------------------------------------------------------
+
+	Gui.Destroying:Connect(
+		function()
+
+			Viewing = false
+
+			if ViewConnection then
+
+				ViewConnection:Disconnect()
+				ViewConnection = nil
+
+			end
+
+			restoreViewCamera()
+
+		end
+	)
+
+	print("XRBLOX PLAYER VIEW: READY")
+
+end
+
+-- ========================================================
+-- ADICIONADO: SISTEMA DE RETORNO SATISFATÓRIO DE PVP & VISUAIS
+-- ADICIONADO AO SEU SCRIPT DE FORMA 100% INDEPENDENTE E SEGURA
+-- ========================================================
+do
+	local TweenService = game:GetService("TweenService")
+	local SoundService = game:GetService("SoundService")
+
+	-- 1. Criação do Banner de Eliminação Holográfico (Kill Banner)
+	local KillBannerFrame = Instance.new("Frame")
+	KillBannerFrame.Name = "KillBanner"
+	KillBannerFrame.Size = UDim2.fromOffset(360, 45)
+	KillBannerFrame.Position = UDim2.new(0.5, -180, 0, -60) -- Começa escondido no topo
+	KillBannerFrame.BackgroundColor3 = Color3.fromRGB(4, 5, 10)
+	KillBannerFrame.BackgroundTransparency = 0.15
+	KillBannerFrame.BorderSizePixel = 0
+	KillBannerFrame.ZIndex = 150
+	KillBannerFrame.Parent = Gui
+	Instance.new("UICorner", KillBannerFrame).CornerRadius = UDim.new(0, 8)
+
+	local BannerStroke = Instance.new("UIStroke")
+	BannerStroke.Color = Config.HubColor
+	BannerStroke.Thickness = 1.5
+	BannerStroke.Transparency = 0.3
+	BannerStroke.Parent = KillBannerFrame
+
+	local KillText = Instance.new("TextLabel")
+	KillText.Size = UDim2.new(1, 0, 1, 0)
+	KillText.BackgroundTransparency = 1
+	KillText.Text = "[ TARGET ELIMINATED // SYSTEM ]"
+	KillText.TextColor3 = Color3.fromRGB(240, 240, 245)
+	KillText.TextSize = 10
+	KillText.Font = Enum.Font.Code
+	KillText.Parent = KillBannerFrame
+
+	-- Função interna para tocar sons do Roblox
+	local function playPvpSound(soundId, volume, speed)
+		local s = Instance.new("Sound")
+		s.SoundId = "rbxassetid://" .. tostring(soundId)
+		s.Volume = volume or 0.5
+		s.PlaybackSpeed = speed or 1
+		s.Parent = SoundService
+		s:Play()
+		game:GetService("Debris"):AddItem(s, 3)
+	end
+
+	-- Função para ativar a animação do Banner de Morte
+	local function triggerKillBanner(killedPlayerName)
+		KillText.Text = "[ TARGET ELIMINATED // " .. string.upper(killedPlayerName) .. " ]"
+		BannerStroke.Color = Config.HubColor
+		
+		-- Toca o som de Kill ultra satisfatório (Ding Eletrônico)
+		playPvpSound(152643534, 0.65, 1.1)
+
+		-- Anima o banner descendo
+		KillBannerFrame:TweenPosition(UDim2.new(0.5, -180, 0, 45), "Out", "Quart", 0.3, true)
+		
+		task.delay(2.2, function()
+			-- Esconde o banner de volta
+			KillBannerFrame:TweenPosition(UDim2.new(0.5, -180, 0, -60), "In", "Quart", 0.3, true)
+		end)
+	end
+
+	-- 2. Sistema de Efeito "Glow Sparks" (Partículas Neon) no Client-side
+	local function spawnGlowSparks(position)
+		task.spawn(function()
+			for i = 1, 8 do
+				local spark = Instance.new("Part")
+				spark.Size = Vector3.new(0.25, 0.2, 0.25)
+				spark.Position = position + Vector3.new(math.random(-1, 1), math.random(-1, 2), math.random(-1, 1))
+				spark.Color = Config.HubColor
+				spark.Material = Enum.Material.Neon
+				spark.CanCollide = false
+				spark.Anchored = false
+				spark.Transparency = 0.1
+				spark.Parent = workspace
+				
+				-- Aplica uma leve dispersão física
+				local velocity = Instance.new("LinearVelocity")
+				velocity.MaxForce = 1500
+				velocity.VectorVelocity = Vector3.new(math.random(-12, 12), math.random(10, 22), math.random(-12, 12))
+				velocity.Attachment0 = Instance.new("Attachment", spark)
+				velocity.Parent = spark
+
+				game:GetService("Debris"):AddItem(spark, 0.8)
+
+				-- Transição de fade-out suave
+				TweenService:Create(spark, TweenInfo.new(0.75), {
+					Size = Vector3.new(0.01, 0.01, 0.01),
+					Transparency = 1
+				}):Play()
+			end
+		end)
+	end
+
+	-- 3. Anel de FOV Suave no Centro da Tela
+	local FovRing = Instance.new("Frame")
+	FovRing.Name = "SmoothFovRing"
+	FovRing.AnchorPoint = Vector2.new(0.5, 0.5)
+	FovRing.Position = UDim2.new(0.5, 0, 0.5, 0)
+	FovRing.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	FovRing.BackgroundTransparency = 1
+	FovRing.ZIndex = 99
+	FovRing.Parent = Gui
+
+	local FovStroke = Instance.new("UIStroke")
+	FovStroke.Color = Config.HubColor
+	FovStroke.Thickness = 0.85
+	FovStroke.Transparency = 0.65
+	FovStroke.Parent = FovRing
+	Instance.new("UICorner", FovRing).CornerRadius = UDim.new(1, 0)
+
+	-- Monitoramento de HP para Hitmarkers, Sounds e Banner
+	local trackedPlayerHps = {}
+
+	local function monitorPlayerPvP(p)
+		if p == LocalPlayer then return end
+		
+		local function onChar(char)
+			local humanoid = char:WaitForChild("Humanoid", 5)
+			if humanoid then
+				trackedPlayerHps[p.UserId] = humanoid.Health
+				
+				humanoid.HealthChanged:Connect(function(currentHealth)
+					local lastHp = trackedPlayerHps[p.UserId] or humanoid.MaxHealth
+					if currentHealth < lastHp then
+						-- Se a vida diminuiu (tomou dano)
+						trackedPlayerHps[p.UserId] = currentHealth
+						
+						local root = char:FindFirstChild("HumanoidRootPart")
+						if root then
+							-- Spawna as faíscas neon na posição do alvo
+							spawnGlowSparks(root.Position)
+						end
+
+						-- Toca Hit Sound crocante (Estilo Rust/Apex)
+						playPvpSound(5043530861, 0.55, math.random(98, 108)/100)
+
+						-- Se morreu
+						if currentHealth <= 0 then
+							triggerKillBanner(p.DisplayName ~= "" and p.DisplayName or p.Name)
+						end
+					else
+						-- Se recuperou vida, apenas atualiza o histórico
+						trackedPlayerHps[p.UserId] = currentHealth
+					end
+				end)
+			end
+		end
+
+		if p.Character then onChar(p.Character) end
+		p.CharacterAdded:Connect(onChar)
+	end
+
+	for _, p in ipairs(Players:GetPlayers()) do monitorPlayerPvP(p) end
+	Players.PlayerAdded:Connect(monitorPlayerPvP)
+
+	-- Loop de suavização do FOV central dinâmico
+	RunService.RenderStepped:Connect(function()
+		FovStroke.Color = Config.HubColor
+		
+		if Config.Enabled and Config.FOV then
+			FovRing.Visible = true
+			
+			-- Calcula tamanho do FOV baseado na câmera
+			local radAngle = math.rad(Config.FOVValue)
+			local sizePx = (math.tan(radAngle/2) * Camera.ViewportSize.Y) * 2
+			
+			-- Variação suave dependendo do movimento do jogador (Foco dinâmico)
+			local walkVelocity = 0
+			if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+				walkVelocity = LocalPlayer.Character.HumanoidRootPart.AssemblyLinearVelocity.Magnitude
+			end
+			local expansionFactor = math.clamp(1 + (walkVelocity * 0.015), 1, 1.45)
+			local targetSize = sizePx * expansionFactor
+
+			-- Lerp suave para o tamanho do anel
+			local smoothSize = FovRing.Size.X.Offset + (targetSize - FovRing.Size.X.Offset) * 0.15
+			FovRing.Size = UDim2.fromOffset(smoothSize, smoothSize)
+		else
+			FovRing.Visible = false
+		end
+	end)
+end
